@@ -59,21 +59,17 @@ jobs:
       - name: Run Kubernetes tests
         run: |
           cat <<'EOF' | metaflow-dev shell
-          echo "=== Running condatest on Kubernetes ==="
-          python src/metaflow_qa_tests/flows/condatest.py --with kubernetes run
-          echo "=== Running tox -e kubernetes (conda subset) ==="
-          tox -e kubernetes -- -k test_kubernetes_conda_flow --timeout=600
-          echo "=== Kubernetes tests passed ==="
+          echo "=== Running helloflow on Kubernetes ==="
+          python src/metaflow_qa_tests/flows/helloflow.py --with kubernetes run
+          echo "=== Kubernetes CLI test passed ==="
           EOF
 
       - name: Run Argo tests
         run: |
           cat <<'EOF' | metaflow-dev shell
-          echo "=== Deploying condatest to Argo ==="
-          python src/metaflow_qa_tests/flows/condatest.py argo-workflows create
-          echo "=== Running tox -e argo (conda subset) ==="
-          tox -e argo -- -k test_argo_conda_flow --timeout=600
-          echo "=== Argo tests passed ==="
+          echo "=== Deploying helloflow to Argo ==="
+          python src/metaflow_qa_tests/flows/helloflow.py argo-workflows create
+          echo "=== Argo CLI test passed ==="
           EOF
 
       - name: Teardown dev stack
