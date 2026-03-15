@@ -1,0 +1,68 @@
+name: Kubernetes & Argo Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled]
+
+jobs:
+  test-kubernetes-argo:
+    if: >-
+      github.event_name == 'push' ||
+      contains(github.event.pull_request.labels.*.name, 'ok-to-test')
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Check out this repo
+        uses: actions/checkout@v4
+
+      - name: Check out Netflix/metaflow (for metaflow-dev)
+        uses: actions/checkout@v4
+        with:
+          repository: Netflix/metaflow
+          path: metaflow-repo
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-k8s-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-k8s-
+
+      - name: Install dependencies
+        run: |
+          pip install ./metaflow-repo kubernetes
+          pip install .
+          pip install tox
+
+      - name: Start dev stack
+        run: |
+          echo "Starting Metaflow dev stack (Minikube + Argo + MinIO)..."
+          MINIKUBE_CPUS=2 metaflow-dev all-up &
+          WAIT_TIMEOUT=600 metaflow-dev wait-until-ready
+          echo "Dev stack is ready."
+
+      - name: Run Kubernetes tests
+        run: |
+          cat <<'EOF' | metaflow-dev shell
+          tox -e kubernetes
+          EOF
+
+      - name: Run Argo tests
+        run: |
+          cat <<'EOF' | metaflow-dev shell
+          tox -e argo
+          EOF
+
+      - name: Teardown dev stack
+        if: always()
+        run: metaflow-dev down
