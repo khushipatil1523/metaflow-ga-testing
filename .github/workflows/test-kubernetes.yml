@@ -51,17 +51,32 @@ jobs:
           WAIT_TIMEOUT=600 metaflow-dev wait-until-ready
           echo "Dev stack is ready."
 
-      - name: Run Kubernetes tests
+      - name: Get devtools path
         run: |
-          cat <<'EOF' | metaflow-dev shell
-          tox -e kubernetes
-          EOF
+          DEVTOOLS_DIR=$(python -c "
+          import sysconfig
+          from pathlib import Path
+          data_dir = sysconfig.get_paths()['data']
+          print(Path(data_dir) / 'share' / 'metaflow' / 'devtools' / '.devtools')
+          ")
+          echo "DEVTOOLS_DIR=$DEVTOOLS_DIR" >> $GITHUB_ENV
+          echo "Devtools path: $DEVTOOLS_DIR"
+
+      - name: Run Kubernetes tests
+        env:
+          METAFLOW_HOME: ${{ env.DEVTOOLS_DIR }}
+          METAFLOW_PROFILE: local
+          AWS_CONFIG_FILE: ${{ env.DEVTOOLS_DIR }}/aws_config
+          AWS_SHARED_CREDENTIALS_FILE: ""
+        run: tox -e kubernetes
 
       - name: Run Argo tests
-        run: |
-          cat <<'EOF' | metaflow-dev shell
-          tox -e argo
-          EOF
+        env:
+          METAFLOW_HOME: ${{ env.DEVTOOLS_DIR }}
+          METAFLOW_PROFILE: local
+          AWS_CONFIG_FILE: ${{ env.DEVTOOLS_DIR }}/aws_config
+          AWS_SHARED_CREDENTIALS_FILE: ""
+        run: tox -e argo
 
       - name: Teardown dev stack
         if: always()
