@@ -52,7 +52,7 @@ jobs:
       - name: Start dev stack
         run: |
           echo "Starting Metaflow dev stack (Minikube + Argo + MinIO)..."
-          MINIKUBE_CPUS=2 metaflow-dev all-up &
+          MINIKUBE_CPUS=4 MINIKUBE_MEMORY=6000 metaflow-dev all-up &
           WAIT_TIMEOUT=600 metaflow-dev wait-until-ready
           echo "Dev stack is ready."
 
