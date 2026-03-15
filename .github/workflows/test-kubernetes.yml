@@ -7,6 +7,11 @@ on:
     branches: [main]
     types: [opened, synchronize, reopened, labeled]
 
+# Cancel in-progress runs for the same branch/PR to save runner time.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test-kubernetes-argo:
     if: >-
@@ -51,32 +56,25 @@ jobs:
           WAIT_TIMEOUT=600 metaflow-dev wait-until-ready
           echo "Dev stack is ready."
 
-      - name: Get devtools path
-        run: |
-          DEVTOOLS_DIR=$(python -c "
-          import sysconfig
-          from pathlib import Path
-          data_dir = sysconfig.get_paths()['data']
-          print(Path(data_dir) / 'share' / 'metaflow' / 'devtools' / '.devtools')
-          ")
-          echo "DEVTOOLS_DIR=$DEVTOOLS_DIR" >> $GITHUB_ENV
-          echo "Devtools path: $DEVTOOLS_DIR"
-
       - name: Run Kubernetes tests
-        env:
-          METAFLOW_HOME: ${{ env.DEVTOOLS_DIR }}
-          METAFLOW_PROFILE: local
-          AWS_CONFIG_FILE: ${{ env.DEVTOOLS_DIR }}/aws_config
-          AWS_SHARED_CREDENTIALS_FILE: ""
-        run: tox -e kubernetes
+        run: |
+          cat <<'EOF' | metaflow-dev shell
+          echo "=== Running condatest on Kubernetes ==="
+          python src/metaflow_qa_tests/flows/condatest.py --with kubernetes run
+          echo "=== Running tox -e kubernetes (conda subset) ==="
+          tox -e kubernetes -- -k test_kubernetes_conda_flow --timeout=600
+          echo "=== Kubernetes tests passed ==="
+          EOF
 
       - name: Run Argo tests
-        env:
-          METAFLOW_HOME: ${{ env.DEVTOOLS_DIR }}
-          METAFLOW_PROFILE: local
-          AWS_CONFIG_FILE: ${{ env.DEVTOOLS_DIR }}/aws_config
-          AWS_SHARED_CREDENTIALS_FILE: ""
-        run: tox -e argo
+        run: |
+          cat <<'EOF' | metaflow-dev shell
+          echo "=== Deploying condatest to Argo ==="
+          python src/metaflow_qa_tests/flows/condatest.py argo-workflows create
+          echo "=== Running tox -e argo (conda subset) ==="
+          tox -e argo -- -k test_argo_conda_flow --timeout=600
+          echo "=== Argo tests passed ==="
+          EOF
 
       - name: Teardown dev stack
         if: always()
