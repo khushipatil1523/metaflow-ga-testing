@@ -111,3 +111,21 @@ tox -e argo -- -m "not conditionals"  # argo tests excluding conditionals
 Adding `tox -e local-conda` would mean 3 backends × 7 features = 21
 potential environments. Marker flags achieve the same result with
 zero extra maintenance.
+## Trade-offs: orthogonal vs hierarchical markers
+
+**Hierarchical** means feature markers imply backend markers —
+`@pytest.mark.triggers` would automatically imply `@pytest.mark.argo_workflows`.
+This reduces annotation: one marker instead of two.
+
+The problem: the implication breaks the moment a second backend supports the
+same feature. If Maestro trigger tests are added later, `triggers` can no longer
+imply `argo_workflows` without excluding them. Every test using `triggers` would
+need to be re-annotated.
+
+**Orthogonal** means markers are independent — `triggers` says nothing about
+which backend. It requires two markers per test but the taxonomy stays stable as
+new backends are added. `pytest -m "triggers and argo_workflows"` and
+`pytest -m "triggers and maestro"` both work without changing any existing tests.
+
+Given the README explicitly mentions Maestro as a future orchestrator, orthogonal
+is the right choice here. The small annotation overhead is worth the extensibility.
